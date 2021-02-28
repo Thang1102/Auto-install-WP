@@ -1,0 +1,3 @@
+---
+- name: rsync wordpress
+  shell: rsync -avP /root/wordpress/ /var/www/html/

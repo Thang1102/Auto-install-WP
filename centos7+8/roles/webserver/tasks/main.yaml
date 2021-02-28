@@ -1,0 +1,107 @@
+---
+# #update OS 
+- name: update OS
+  shell: yum -y update 
+# #install LAMP
+- name: Install LAMP
+  yum:
+    name: ['httpd', 'mariadb-server', 'mariadb', 'python2', 'python3','wget']
+    state: latest
+- name: Install php
+  script: Install_php74.sh
+- name: install module php
+  yum:
+    name: "{{item}}"
+    state: present
+  with_items:
+  - php-common
+  - php-opcache 
+  - php-cli
+  - php-gd
+  - php-curl
+  - php-mysqlnd
+  - php-intl
+  - php-xmlrpc
+  - php-xml
+  - php-soap
+  - php-fpm
+# #config firewall
+- name: started firewalld
+  shell: systemctl start firewalld
+- name: enabled firewalld
+  shell: systemctl enable firewalld
+- name: Ensure HTTP and HTTPS can pass the firewall
+  firewalld:
+    service: '{{item}}'
+    state: enabled
+    permanent: True
+    immediate: True
+  become: True
+  with_items:
+  - http
+  - https
+# # #create databases
+- name: install PyMYQL
+  pip:
+    name: PyMySQL
+#Start service
+- name: Ensure service enabled and started
+  service:
+    name: '{{item}}'
+    state: started
+    enabled: True
+  with_items:
+  - mariadb
+  - httpd
+# # # ############
+- name: Create database wordpress
+  mysql_db:
+    name: wp_db
+    state: present
+- name: Create user wordpressuser
+  mysql_user:
+    name: wpuser
+    host: localhost
+    password: Abc@#$432XXD
+    priv: 'wp_db.*:ALL'
+    state: present
+- name: Download wordpress
+  get_url:
+    url: https://vi.wordpress.org/latest-vi.tar.gz
+    dest: /root
+- name: extract wordpress
+  unarchive:
+    src: /root/wordpress-5.5.4-vi.tar.gz
+    dest: /root
+    remote_src: yes
+# call files
+- include: files/main.yaml
+# # #change content file config.php
+- name: Backup file config wp
+  shell: cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
+- name: Config db name
+  replace:
+    path: /var/www/html/wp-config.php
+    regexp: 'ten_database'
+    replace: 'wp_db'
+- name: Config username
+  replace:
+    path: /var/www/html/wp-config.php
+    regexp: 'username'
+    replace: 'wpuser'
+- name: Config password
+  replace:
+    path: /var/www/html/wp-config.php
+    regexp: 'mat_khau'
+    replace: 'Abc@#$432XXD'
+# # #change file and permision
+- name: Delete file wp-config-sample.php
+  shell: rm -f /var/www/html/wp-config-sample.php
+- name: Delete file index.html
+  shell: rm -rf /var/www/html/index.html
+- name: Set user:group
+  shell: chown -R apache:apache /var/www/html/*
+- name: Set permision
+  shell: chmod -R 755 /var/www/html/*
+#call handers
+- include: handlers/main.yaml
